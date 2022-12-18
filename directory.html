@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <meta http-equiv='X-UA-Compatible' content='IE=edge'>
+    <title>dir</title>
+    <meta name='viewport' content='width=device-width, initial-scale=1'>
+    <script src='js/jquery-3.2.1.min.js'></script>
+    <style>
+
+
+        .popUp{
+            display: none;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 300px;
+            height: 300px;
+            box-shadow: 0 0 10px  rgb(141, 136, 136),
+                        0 0 20px rgb(189, 180, 180);
+            transform: translate(-50%, -50%);
+            border-radius: 15px;
+        }
+    </style>
+    
+    <script src='js/socket.io.js'></script>
+</head>
+<body>
+<input type="file" class="input" name="files[]" webkitdirectory directory multiple >
+<button class='startUpload'>Upload</button>
+<p></p> 
+
+    <div class='popUp'>
+        <div class="workName"></div>
+        <div class= "workPorgress"></div>
+        <button class="uploadCancel">Cancel</button>
+    </div>
+
+
+<script>
+
+
+
+
+
+
+
+    var is_white=0;
+    var is_uploadPopup=0;
+    const dirlist= [];
+
+    io= io('http://localhost:8086/')
+    $('.input').on("change", function(){
+        var totelFiles= $(this)[0].files.length;
+        var files= $(this)[0].files;
+        
+        // console.log(files);
+        // console.log(totelFiles);
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+
+            const fileName= file.name;
+            const fileSize= file.size;
+            const fileSizeMb= (fileSize/1048576);
+            const rpathFile= file.webkitRelativePath;
+
+            const rpathDir= rpathFile.substr(0, rpathFile.lastIndexOf("/"));
+
+            const rDirName= rpathDir.split('/');
+            let FullRdir= "";
+            for (let i = 0; i < rDirName.length; i++) {
+                const rDir = rDirName[i];
+                FullRdir= FullRdir+"/"+rDir;
+                if(!dirlist.includes(FullRdir)){
+                dirlist.push(FullRdir);
+            }
+            }
+
+        }
+        console.log(dirlist);
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            
+            const fileName= file.name;
+            const fileSize= file.size;
+            const fileSizeMb= (fileSize/1048576);
+
+            if(fileSizeMb<50){
+                is_white=1;
+            }else{
+                // console.warn("File Size is More Then 50Mb");
+                is_white= 0;
+            }
+            
+        }
+    });
+
+    $('.startUpload').on('click', function () {
+        $('.popUp').slideDown(400);
+        is_uploadPopup=1;
+        if(is_white){
+            
+            io.emit('dirArray', dirlist);
+
+            // var UploadDirStatus= await io.on('uploadDir');
+
+            // if(UploadDirStatus.status){
+            //     console.log('done');
+            // }
+
+        }else{
+            // console.log('eroro')
+            $('.workName').text("Some of Selected Files Size is More Then 50 MB")
+        }
+    });
+    
+    $('.uploadCancel').on('click', function () {
+        is_uploadPopup=0;
+        $('.popUp').slideToggle(400);
+    })
+
+    io.on('uploadDir', async function(data){
+        if(data.status){
+            if(is_uploadPopup){
+                console.log('Upload..');
+                var totelFiles= $('.input')[0].files.length;
+                var files= $('.input')[0].files;
+
+                uploadedFiles=0;
+                function asyncAjax(){
+                    if(uploadedFiles<totelFiles){     
+                        
+                        var file= files[uploadedFiles];
+                        var fileName= file.name;
+                        var filePath= file.webkitRelativePath;
+                        var fileDir= filePath.substr(0, filePath.lastIndexOf("/"));
+
+                        var formData= new FormData();
+
+                        formData.append('fileName', fileName);
+                        formData.append('fileDir', fileDir);
+                        formData.append('fileUser', 'ubuntu');
+                        formData.append('fileHost', "127.1.0.1");
+                        formData.append('file', file);
+
+
+                            // console.log(data);
+                                $.ajax({
+                                    url: 'http://localhost:8086/fileupload',
+                                    type: 'POST',
+                                    enctype: 'multipart/form-data',
+                                    // dataType: 'json',
+                                    processData: false,
+                                    contentType: false,
+                                    data: formData,
+                                    // {
+                                        // "file": formData,
+                                        // "fileName": fileName,
+                                        // "fileDir": fileDir,
+                                        // "fileUser": 'ubuntu',
+                                        // "fileHost": "127.1.0.1"
+// 
+                                    // },
+                                    success: function (info) {
+                                        // console.log(info);
+                                        if(info.status){
+                                            uploadedFiles++;
+
+                                            asyncAjax();
+                                        }else{
+                                            
+                                        }
+                                    },
+                                    error: function(error){
+                                    }
+                                    })
+                                
+                    }
+                }
+
+
+
+                asyncAjax();
+
+                
+            }
+        }else{
+            $('.workName').text("Error!! Unable to Create Directroy Required To Upload Files");
+        }
+    })
+
+
+</script>   
+</body>
+</html>
